@@ -1,93 +1,110 @@
-# Photo Time Renamer
+# PhotoWorkbench
 
-按照片拍摄时间批量重命名的桌面工具。当前可运行版本使用 Python、Tkinter 和 Pillow；下一阶段计划将重命名逻辑移植到 ImageOptim 的 Objective-C 项目，在同一个原生 macOS 应用中完成重命名与压缩。
+当前版本：**0.9**（Git 标签 `v0.9`）。应用版本号以 `native/Info.plist` 的 `CFBundleShortVersionString` 为准。
 
-## 当前状态
+一个独立的 macOS 原生图片工具：按文件创建时间重命名，或使用 ImageOptim 的压缩后端优化图片。两项操作独立，添加文件不会自动修改文件。
 
-- 已实现：选择多个文件夹、递归扫描、按时间重命名、重名编号、日志和统计。
-- 已有：启动脚本和使用临时图片的回归检查。
-- 环境已验证：Apple Silicon 本机上的 Xcode、Rust/Cargo，以及原生框架的基础编译检查。
-- 尚未完成：获取 ImageOptim 源码、完整构建原版、原生重命名模块和界面集成。本仓库目前不包含 ImageOptim 源码或定制应用。
+当前提供 SwiftUI 应用、Xcode 工程、固定版本依赖准备脚本和原生验收检查。成品位于 `dist/PhotoWorkbench.app`，应用标识是 `local.cc.PhotoWorkbench`，不会覆盖原 ImageOptim。现有 Python 版本保持原样，作为旧版工具和回归参考。
 
-## 当前命名规则
+## 使用
 
-文件名格式为 `YYMMDDHHmm.ext`，使用 24 小时制，精确到分钟，不保留原文件名。例如拍摄于 2026 年 10 月 21 日 14:35 的 `IMG_1234.jpg` 会改为 `2610211435.jpg`。
-
-1. 依次尝试 EXIF 的 `DateTimeOriginal`、`DateTimeDigitized`、`DateTime`；无法读取有效时间时，使用文件修改时间，而不是文件创建时间。
-2. EXIF 时间按记录值使用；文件修改时间按电脑本地时区转换。目前不处理 EXIF 时区偏移。
-3. 保留原扩展名及其大小写；目标名称已存在时追加 `_001`、`_002` 等编号。
-4. 文件名已匹配本次读出的时间及可选编号时跳过；旧的 `originalname_timestamp.ext` 格式会转换为当前格式。
-5. 在原文件夹内直接改名，不复制图片、不压缩，也不提供撤销记录。时间信息变化后，再次运行可能重新命名。
-
-扫描扩展名包括 JPG、JPEG、PNG、WebP、HEIC、HEIF。扩展名被扫描不代表元数据一定可读；HEIC/HEIF 等格式取决于 Pillow 和本机解码支持，读取失败时会退回文件修改时间。
-
-## 运行现有 Python 版本
-
-依赖 Python 3.10+、Tkinter 和 Pillow。macOS 启动脚本优先使用本机环境 `/Users/cc/opt/miniconda3/envs/mydailypython`，其次尝试 Miniconda 基础环境和系统路径中的 `python3`。
-
-如果首选环境中尚未安装 Pillow，可执行：
+打开 `dist/PhotoWorkbench.app`，或运行：
 
 ```bash
-/Users/cc/opt/miniconda3/envs/mydailypython/bin/python -m pip install Pillow
+bash run_native_app.sh
 ```
 
-在项目目录启动：
+- 将图片或文件夹拖入窗口，或点击 **Add**；文件夹递归扫描，跳过隐藏项、符号链接和应用包，并按文件身份去重。
+- **Rename** 和 **Compress** 都处理当前列表的全部适用图片，不受选中行影响。处理期间添加的文件留到下一批。
+- **Stop** 取消剩余工作，保留已完成和已安全保存的结果。处理中退出会先停止并收尾。
+- 空格或双击 Quick Look；右键可以在 Finder 中显示或从列表移除。Clear 和移除只改变列表，不删除图片。
+- 退出会清空列表和撤销历史，保留设置及窗口大小。
+
+界面为英文，使用系统深浅色。新窗口默认约 660 × 460，可缩小到 620 × 380；Status 列固定为 95 点，长状态可悬停查看。设置使用独立分段选择器，避免系统自动将标签塞进标题栏。第一版针对自己的 Apple Silicon Mac；工程最低系统设为 macOS 15，实际验证环境为本机 macOS 27 / Xcode 27.1。
+
+### 重命名
+
+支持 JPG/JPEG、PNG、HEIC/HEIF、WebP。默认 `yyMMddHHmmss.ext`，也可选择 `original_yyMMddHHmmss.ext`；保留扩展名大小写，同名加 `_001` 等编号，绝不覆盖现有文件。
+
+重命名始终使用 Finder 中的文件创建时间（Created），按本机时区转换；EXIF 拍摄日期、图片日期和最近修改时间都不参与命名。无法读取创建时间时报告错误，不用修改时间或虚构日期代替。添加文件时记录创建时间，确保压缩前后的会话内命名依据一致。
+
+识别旧分钟格式、新秒格式及冲突编号，避免重复追加。当前会话记住原始名称和时间；重启后，纯时间名称无法恢复原始名称时，“原名＋时间”会跳过并说明原因。
+
+**Undo Rename** 按批次逆序撤销。文件被外部修改、替换或原路径被占用时拒绝覆盖。移出列表会同时移除该文件的会话撤销记录。
+
+### 压缩与恢复
+
+JPEG/PNG 使用 ImageOptim 的 Objective-C Job、JobQueue 和 Workers，保留工具组合、优化等级映射、候选文件比较及较小结果优先逻辑。HEIC/HEIF/WebP 只重命名；GIF/SVG 不在第一版范围。
+
+默认严格无损、优化力度 4，保留照片元数据、文件日期和权限。General、Quality、Optimization Speed 设置中可明确允许有损压缩或元数据移除。Guetzli 要求开启有损、JPEG 质量至少 85、允许移除 JPEG 元数据；冲突会提示，程序不自动更改这些选项。
+
+候选结果需先通过像素和元数据验证：
+
+- PNG 使用静态编译的 libpng 解码为不预乘、不做色彩转换的 RGBA16，比较包含透明区域 RGB 在内的全部像素。
+- JPEG 使用相同 ImageIO 解码路径和固定目标色彩空间比较像素。
+- 保留元数据时，检查 PNG 附加块和 JPEG APP/COM 数据；不能证明保留完整时拒绝该候选，不冒险保存。
+- 只有更小且通过验证的文件才写入；无合格候选时保留原图。严格要求可能使结果比 ImageOptim 默认行为略大。
+
+保存使用同卷临时文件和原子交换，再将原图移入废纸篓。废纸篓失败会回退；如果并发修改使回退无法安全完成，则保留恢复文件并在错误详情给出路径，不删除已有同名文件。
+
+**Restore Originals** 仅在当前会话可用，恢复原始内容而保留当前文件名。原图备份被清空或文件被外部修改时拒绝恢复。恢复成功后原废纸篓条目仍保留，避免额外的删除步骤。
+
+## 准备、构建与验证
+
+开发需要完整 Xcode、命令行工具以及 Python 3（依赖准备使用标准库，生成测试图片另需 Pillow）。脚本优先使用本机 `mydailypython` 环境。运行成品不需要 Python、Rust、Homebrew 或另装 ImageOptim。
 
 ```bash
-bash run_app.sh
+bash run_prepare.sh       # 首次下载固定源码，复制已确认的预编译引擎
+bash run_build.sh         # 离线校验依赖、编译、打包和本机临时签名
+bash run_native_checks.sh # 构建、运行上游对比和原生功能验收
 ```
 
-也可以在 Finder 中双击 `RunPhotoTimeRenamer.command`。窗口中添加文件夹，再点击 `Start Rename`；会同时处理子文件夹。
+首次准备默认从 `/Applications/ImageOptim.app` 1.9.3 复制引擎；也可设置 `IMAGEOPTIM_APP` 为同版本安装位置。PNGOUT 使用官方 2023-03-22 的原生 arm64 版本。引擎副本、源码及下载缓存分别保留在 `vendor/`、`build/downloads/`；后续构建只校验，不自动联网更新。不符锁定校验值的依赖会停止构建。
 
-核心 Python 程序也可在满足依赖的 Windows/Linux 环境中运行：
+可以直接用 Xcode 打开 `PhotoWorkbench.xcodeproj`。工程配置由 `scripts/generate_project.py` 确定生成，添加源文件后运行该脚本并保留生成的工程文件。应用图标源在 `scripts/make_icon.swift`，生成后的 icns 随源码保留。
+
+验收只使用生成的测试图片，会将这些测试图片的原图送入废纸篓以验证真实保存路径，不访问个人图库。故障注入只存在于检查程序中。检查包括创建时间命名（忽略 EXIF 和修改时间）、撤销、透明与 16 位 PNG、EXIF/ICC 保留、异常大尺寸拒绝、各引擎、可选有损、只读与损坏文件、保存失败、引擎失败、备份丢失、外部改动、取消及 300 张图片批量操作。
+
+2026-10-24 本机验证：原生检查 117 项通过，旧 Python 检查通过，应用本机签名通过；独立 GUI 验证副本确认设置三页切换无标题重叠、主窗口为 660 × 460、创建时间预览正确、空格 Quick Look 可用。依赖从空目录复现得到 917 个一致文件。检查范围不等于所有格式、硬件和文件系统均已验证。
+
+输出记录：`build/build.log`、`build/checks.log`（将检查输出重定向到此处时）、`build/baseline.log`、`build/comparison.json`。上游对比单独运行：
 
 ```bash
-python photo_time_renamer.py
+bash run_baseline_checks.sh
 ```
 
-## 检查
+它构建固定提交的原始后端，仅调整界面头文件引用和应用内引擎定位；压缩参数、选择及保存逻辑保留上游行为，用相同引擎、同批图片和对应设置对比。
 
-```bash
-bash run_checks.sh
-```
+## 结构与长期约定
 
-脚本优先使用 `mydailypython`，不存在时使用 `python3`。检查包括 Python 语法、EXIF 时间命名、修改时间回退、重名编号、旧名称转换、重复运行，以及图片内容保持不变。测试只操作临时生成的图片，不启动界面、不修改个人照片；这不等同于所有图片格式和界面行为都已验证。
-
-## ImageOptim 原生集成方案
-
-已选择修改现有 [ImageOptim](https://github.com/ImageOptim/ImageOptim) 的路线，以 Objective-C 和 macOS ImageIO/Foundation 实现重命名，保留成熟压缩引擎。第一版优先验证 JPEG、PNG，增加默认关闭的“压缩前按拍摄时间重命名”选项，并沿用当前纯时间命名规则。
-
-计划顺序：
-
-1. 获取独立的上游源码副本并记录版本，先完成未加入重命名功能的原版构建验证。
-2. 根据实际构建结果调整本机签名配置和失效下载地址。
-3. 实现独立重命名模块，在原始 EXIF 或文件时间被压缩流程改变前读取时间，并在压缩任务使用路径前完成改名。
-4. 更新列表和任务路径；重命名失败时显示原因并跳过该文件的压缩。
-5. 验证完整流程，生成与官方应用可区分的本机定制版本。
-
-原生版需要额外验证：元数据清理后重复处理仍不会再次改名、名称冲突不覆盖文件、中文和空格路径、只读文件、批量任务，以及集成前后的压缩功能。现有 Python 的重复处理规则不能直接当作压缩后仍然有效的保证。
-
-### 构建依赖与待处理事项
-
-- Xcode 提供 Objective-C 编译器和 macOS SDK；ImageIO/Foundation 无需另装。
-- 按上游说明使用 rustup 管理 Rust。Rust 用于构建部分压缩引擎，新增重命名模块本身不依赖 Rust。
-- SVG 相关构建流程使用 Node.js/npm；还需要 Git、Make 和外部依赖下载访问。
-- 当前只验证了 Apple Silicon 本机目标；如需兼容 Intel，需补齐相应目标并验证。
-- 上游脚本包含 `Developer ID` 签名步骤，计划为本机版本调整签名方式；尚未验证完整应用的签名和启动。
-- 已检查的 SourceForge 旧 HTTP 地址访问失败，HTTPS 版本检查通过；历史 AdvanceCOMP 归档地址返回网页，仍需核实下载内容。
-
-以上是环境检查和计划，不表示完整 ImageOptim 已经构建成功。原生构建流程确定后再增加对应 `run_*.sh`，将准备、构建和验证步骤写入文档。
-
-## 文件结构
-
-| 文件 | 用途 |
+| 位置 | 用途 |
 | --- | --- |
-| `photo_time_renamer.py` | 当前重命名逻辑和 Tkinter 界面 |
-| `test_renaming.py` | 临时图片回归检查 |
-| `run_app.sh` | macOS 终端启动入口 |
-| `RunPhotoTimeRenamer.command` | Finder 双击启动入口和 Python 环境选择 |
-| `run_checks.sh` | 语法与重命名检查入口 |
-| `AGENTS.md` | 项目协作规则 |
-| `.gitignore` | 本地缓存和构建产物排除规则 |
+| `native/` | SwiftUI 界面、Swift 重命名、Objective-C 桥接、安全保存与像素校验 |
+| `PhotoWorkbench.xcodeproj/` | 可直接打开的原生工程 |
+| `patches/imageoptim.patch` | 相对固定上游提交的兼容及必要行为修改 |
+| `dependencies.lock.json` | 源码、引擎、许可证来源和 SHA-256 |
+| `scripts/`、`run_*.sh` | 依赖准备、构建、启动、打包和验证入口 |
+| `tests/` | 生成图片、原生验收、失败注入及原始后端对比 |
+| `photo_time_renamer.py`、`test_renaming.py` | 未改变的旧 Python 版本及其检查 |
 
-这是日常图片工具项目，长期决策和运行说明集中维护在本 README 中。
+Git 保留上述源码、工程、测试、运行脚本、图标及其生成脚本、依赖锁、补丁、许可证和项目说明，作为 0.9 的可复现构建输入；`vendor/`、`build/`、`dist/`、个人照片、缓存和 Xcode 个人状态不纳入版本管理。检出源码后仍需按上面的准备与构建步骤生成应用。
+
+依赖来源和许可证见 `THIRD_PARTY.md`，成品内也包含 Notices。源码固定于 ImageOptim `8a4651e14ca53022f6a318071d08bb132fc56ce9`；预编译引擎来自安装包 1.9.3，两者分别记录，不宣称其版本完全对应。
+
+当前不启用跨会话压缩结果缓存；同一 Job 保留上游会话内重复优化记录。设置仅使用自己的应用域，不访问 ImageOptim 的共享设置或迁移其旧缓存。每次最多处理两张图片，内部沿用上游 CPU 调度；像素验证串行执行，控制峰值内存。
+
+### 明确限制
+
+- APNG 暂不压缩，以免动画被错误地当作单帧处理；仍可按 PNG 重命名。
+- 单张解码像素缓冲超过 256 MiB 时拒绝压缩，保留原图并显示原因。峰值验证缓冲最多为两张图像；大批量并不意味着同时解码全部图片。
+- 某些非常规 JPEG 或损坏元数据无法完整验证时会保守跳过候选。不同引擎可能没有更小的安全结果。
+- 仅做本机临时签名，没有开发者公证或公开发布流程。未声明 Intel、旧版 macOS、网络盘或云同步竞争场景已经通过实机验收。
+- 元数据保留可能限制有损压缩效果；这不等于引擎未运行。
+
+旧 Python 工具仍用 `bash run_app.sh` 启动、`bash run_checks.sh` 验证，保持原有分钟精度命名且不提供压缩与撤销。
+
+这是日常图片工具，长期记忆维护在本 README，不建立科研项目 `PROJECT.md`。
+
+## 项目目录为什么大于源码包
+
+本机首次完整构建后，目录约 391 MiB，其中 build/ 约 360 MiB，包含 Xcode 编译缓存、系统框架预编译模块、测试应用和复现验证副本。vendor/ 约 18 MiB，成品 dist/PhotoWorkbench.app 约 9.9 MiB。它们均被 Git 忽略。GitHub 下载的几百 KiB 是压缩后的上游源码，不含这些构建和测试产物，也没有完整的已编译引擎；不能直接与开发工作目录比较。build/ 可以重新生成，删除后下次构建会重新产生缓存；本次不自动清理。

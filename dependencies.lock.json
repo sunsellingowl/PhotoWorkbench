@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "imageoptim": {
+    "commit": "8a4651e14ca53022f6a318071d08bb132fc56ce9",
+    "url": "https://codeload.github.com/ImageOptim/ImageOptim/tar.gz/8a4651e14ca53022f6a318071d08bb132fc56ce9",
+    "sha256": "ae7b68f43d981c5d251935e963016893d1ce1ebd0bf2ed51eacb312d33fc889a"
+  },
+  "libpng": {
+    "version": "1.6.50",
+    "url": "https://codeload.github.com/pnggroup/libpng/tar.gz/refs/tags/v1.6.50",
+    "sha256": "71158e53cfdf2877bc99bcab33641d78df3f48e6e0daad030afe9cb8c031aa46"
+  },
+  "pngout": {
+    "version": "2023-03-22",
+    "url": "https://www.jonof.id.au/files/kenutils/pngout-20230322-mac.zip",
+    "sha256": "2e3eb79345206040ae3a0d0d0ecfe9ad01d92fe5002b8a1676a65632a56840e1"
+  },
+  "engines": {
+    "imageoptimAppVersion": "1.9.3",
+    "files": {
+      "advpng": "eb82569013fe2742cbb41e12756445ca2e5df620531fa35d6f449b483d2fac68",
+      "guetzli": "16818477d13364b52423f1584da36a01e39b45efd3fc2cb9c0bb40d9207ec0e7",
+      "jpegoptim": "7d18a574d89ed90cbea1b3a9f39c22658315c88bc620ddfa53bb5472370c9391",
+      "jpegtran": "f51ee52386150c4ab4b96541d315d6f524dfdc368f2d30c68c820bbcaf0c6b50",
+      "libimageoptimjpeg.dylib": "f308cb154eda28bd1d3f947b50fa3cd843ead93585287900ee4b153845e76bcb",
+      "liblibpng.dylib": "6aa4ba8262d46519e5324104ef331b59293cb3b14f8bee55ad99d775a6091345",
+      "oxipng": "a7ba3cf58f99ef8b5b6ae20c3fd52505e7a20228535ef14916ed0d4104f3c991",
+      "pngcrush": "a6a8c8076a8b9d0eadbd4edebdbb40ec51a6a217027fa0d083407aa217deea8c",
+      "pngout": "1981cd0aadc6b2f70353f41d483810285b67ad282cc9cf8877f79d87e33f7c4a",
+      "pngquant": "afe1e9d2c5c6f81ca633cfcf1ec20fbc8774c76ac0cef0347cbb6311eacf91ee",
+      "zopflipng": "466b4ff16a867da45a6c6311188c2d14bbfbe55f92d6acf5067881e8669f77c6"
+    }
+  },
+  "notices": {
+    "ImageOptim-Credits.html": "c64143c34ef51b20d5fa8572895560a57c2a706d6f516e415acea2fa9b42f348",
+    "ImageOptim-LICENSE.txt": "2580121d730b4450c9ce26d54537f43d897d808cb2b7a9af270463fd2424d1ec",
+    "PNGOUT.txt": "075aa49bc56328e5cd250a7cb58d0875ac9547a9a30fc185800f1dc6cbd1dadb",
+    "libpng-LICENSE.txt": "16d9daaafbf63a31a5bdc91d4600972548fef5aaa1244202393288dbd079c49a",
+    "OxiPNG-LICENSE.txt": "1bc9688d785fa50345f803824ddde000bdabedda9d1803dc41a1fedd81f784fc",
+    "JPEGOptim-COPYING.txt": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+    "MozJPEG-LICENSE.txt": "60c756742db3ad1913304e8b13f0e86e22e51adb50cc0b3333c163f7e45ceec1",
+    "Guetzli-LICENSE.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "Zopfli-COPYING.txt": "018b1cb87efdf7a04c2fcc13d57ed63f62149113fb207b27ea13430d64f13513",
+    "AdvanceCOMP-COPYING.txt": "91df39d1816bfb17a4dda2d3d2c83b1f6f2d38d53e53e41e8f97ad5ac46a0cad",
+    "pngquant-COPYRIGHT.txt": "e4f467f7abf860b4e620f5f60fdd88bc3a63a0fdb98a481fb002b5e511c9b826",
+    "MozJPEG-IJG.txt": "4b7b9f8c03bb8d60270dfd12684e70ab21e4abfd27e73905cd1a7c4cae6f5cdb",
+    "PNGCrush-LICENSE.txt": "c3e7c30b4bd0b463ae92004f634ebac09782cc9355086eaa5cb8268e9a6525b7"
+  },
+  "noticeDownloads": {
+    "OxiPNG-LICENSE.txt": {
+      "url": "https://raw.githubusercontent.com/shssoichiro/oxipng/v9.0.0/LICENSE",
+      "sha256": "1bc9688d785fa50345f803824ddde000bdabedda9d1803dc41a1fedd81f784fc"
+    },
+    "JPEGOptim-COPYING.txt": {
+      "url": "https://raw.githubusercontent.com/tjko/jpegoptim/5ee8faccb87456231cbd975faa7f75e0fdf74840/COPYING",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+    },
+    "MozJPEG-LICENSE.txt": {
+      "url": "https://raw.githubusercontent.com/ImageOptim/mozjpeg-cocoa/260b65c31187eb4e0be2e35e4714374e992b954a/LICENSE.md",
+      "sha256": "60c756742db3ad1913304e8b13f0e86e22e51adb50cc0b3333c163f7e45ceec1"
+    },
+    "Guetzli-LICENSE.txt": {
+      "url": "https://raw.githubusercontent.com/google/guetzli/214f2bb42abf5a577c079d00add5d6cc470620d3/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "Zopfli-COPYING.txt": {
+      "url": "https://raw.githubusercontent.com/ImageOptim/zopfli/ba79a6547d7c82b8ec43911b19168afaf2767100/COPYING",
+      "sha256": "018b1cb87efdf7a04c2fcc13d57ed63f62149113fb207b27ea13430d64f13513"
+    },
+    "AdvanceCOMP-COPYING.txt": {
+      "url": "https://raw.githubusercontent.com/amadvance/advancecomp/advancecomp-1_15/COPYING",
+      "sha256": "91df39d1816bfb17a4dda2d3d2c83b1f6f2d38d53e53e41e8f97ad5ac46a0cad"
+    },
+    "pngquant-COPYRIGHT.txt": {
+      "url": "https://raw.githubusercontent.com/kornelski/pngquant/515575a1e2389f18dd1cef8f3865854bc98495a1/COPYRIGHT",
+      "sha256": "e4f467f7abf860b4e620f5f60fdd88bc3a63a0fdb98a481fb002b5e511c9b826"
+    },
+    "MozJPEG-IJG.txt": {
+      "url": "https://api.github.com/repos/ImageOptim/mozjpeg-cocoa/contents/README.ijg?ref=260b65c31187eb4e0be2e35e4714374e992b954a",
+      "sha256": "4b7b9f8c03bb8d60270dfd12684e70ab21e4abfd27e73905cd1a7c4cae6f5cdb"
+    }
+  },
+  "engineInfo": {
+    "oxipng": {
+      "reportedVersion": "9.0.0",
+      "license": "MIT"
+    },
+    "pngquant": {
+      "reportedVersion": "3.0.2",
+      "license": "GPL-3.0-or-later and original pngquant licenses"
+    },
+    "jpegoptim": {
+      "reportedVersion": "1.4.4",
+      "license": "GPL-2.0-or-later"
+    },
+    "jpegtran": {
+      "reportedVersion": "MozJPEG 4.1.5 (build 20231014)",
+      "license": "IJG, BSD-3-Clause and zlib-style components"
+    },
+    "pngcrush": {
+      "reportedVersion": "1.8.10 (modified for ImageOptim)",
+      "license": "PNGCrush permissive license; notice extracted from this binary with -h"
+    },
+    "advpng": {
+      "reportedVersion": "AdvanceCOMP 1.15",
+      "license": "GPL-2.0-or-later"
+    },
+    "guetzli": {
+      "reportedVersion": null,
+      "identity": "ImageOptim 1.9.3 bundled binary; SHA-256 is authoritative",
+      "license": "Apache-2.0"
+    },
+    "zopflipng": {
+      "reportedVersion": null,
+      "identity": "ImageOptim 1.9.3 bundled binary; SHA-256 is authoritative",
+      "license": "Apache-2.0"
+    },
+    "pngout": {
+      "reportedVersion": "2023-03-22 macOS universal release",
+      "license": "Closed source, separately distributed official executable"
+    },
+    "liblibpng.dylib": {
+      "reportedVersion": "1.4.5-optipng (reported by pngcrush)",
+      "license": "libpng"
+    },
+    "libimageoptimjpeg.dylib": {
+      "reportedVersion": null,
+      "identity": "ImageOptim 1.9.3 bundled library; SHA-256 is authoritative",
+      "license": "IJG, BSD-3-Clause and zlib-style components"
+    }
+  },
+  "patchedSourceSha256": {
+    "imageoptim/Backend/Job.h": "cc1cbe829319cd18bfabea922fddb1d92b48c2a42111230c0a7de66d60882511",
+    "imageoptim/Backend/Job.m": "7769ca015682393395be13c21b7c262e9a7f6d75e0778460a5f827f2884dfebe",
+    "imageoptim/Backend/JobQueue.m": "3f738e93eae2f191379cb19c53006df0127e0226525dacce03f0b4dd57af4293",
+    "imageoptim/Backend/Workers/CommandWorker.m": "9fbb1bd204ebe6e80b75206cb4810915c93e43d9bbbe00275808aec44ec2ab74",
+    "imageoptim/Backend/Workers/JpegoptimWorker.m": "bbfe662555007967f89b30800b5e7c5b2c64168bda47d2b951e018b29ed96b21",
+    "imageoptim/Backend/Workers/OxiPngWorker.m": "3a3062dde2fa950269722403a49c63386164e47683b5848217acc153288b69cf",
+    "imageoptim/Backend/Workers/PngCrushWorker.m": "39aa7cdaa9025843b39406174a54a8aff2e906b68443c310b5c5e4e87e9f8904",
+    "imageoptim/Backend/Workers/PngquantWorker.m": "84fa5d9463b8cbd2acce09342be6e25e0946ed4bd38197e8e98f3e44e24f93fa",
+    "imageoptim/Backend/Workers/ZopfliWorker.m": "a305f6efa82ae7643250cf16215e09e6ee91c3313238159581514b639c1ca669",
+    "imageoptim/ResultsDb.m": "2c2d1b8a0446742233ed6aa4dbae81bbace683378dff235365c1006dc6fba430"
+  }
+}

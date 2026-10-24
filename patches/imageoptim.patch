@@ -1,0 +1,244 @@
+--- a/imageoptim/Backend/Job.h
++++ b/imageoptim/Backend/Job.h
+@@ -43,6 +43,8 @@
+ - (NSString *)previewItemTitle;
+ 
+ @property (readonly) BOOL canRevert;
++// PhotoWorkbench: transparent RGB may only be changed with explicit lossy opt-in.
++@property (assign) BOOL pwStrictPixels;
+ @property (readonly) BOOL isDone, isFailed;
+ 
+ - (void)enqueueWorkersInCPUQueue:(NSOperationQueue *)queue fileIOQueue:(NSOperationQueue *)fileIOQueue serialQueue:(dispatch_queue_t)serialQueue defaults:(NSUserDefaults *)defaults;
+--- a/imageoptim/Backend/Job.m
++++ b/imageoptim/Backend/Job.m
+@@ -4,7 +4,7 @@
+ 
+ #import "Job.h"
+ #import "TempFile.h"
+-#import "ImageOptimController.h"
++// PhotoWorkbench supplies its own UI.
+ #import "Workers/Save.h"
+ #import "Workers/AdvCompWorker.h"
+ #import "Workers/PngquantWorker.h"
+@@ -517,7 +517,7 @@
+ - (void)setSettingsHash:(NSArray *)allWorkers {
+     CC_MD5_CTX md5ctx = {};
+     CC_MD5_Init(&md5ctx);
+-    CC_MD5_Update(&md5ctx, "3", 1); // to update when programs change
++    CC_MD5_Update(&md5ctx, "PhotoWorkbench.strict.v1", 24); // to update when programs change
+     for (Worker *w in allWorkers) {
+         NSInteger tmp = [w settingsIdentifier];
+         CC_MD5_Update(&md5ctx, &tmp, sizeof(tmp));
+@@ -565,6 +565,7 @@
+     NSMutableArray *worker_list = [NSMutableArray new];
+     NSInteger level = [defs integerForKey:@"AdvPngLevel"]; // AdvPNG setting is reused for all tools now
+     BOOL lossyEnabled = [defs boolForKey:@"LossyEnabled"];
++    self.pwStrictPixels = !lossyEnabled;
+     if (lossyEnabled) {
+         dispatch_async(dispatch_get_main_queue(), ^() {
+             [defs setBool:YES forKey:@"LossyUsed"];
+@@ -614,7 +615,7 @@
+         }
+         break;
+     case FILETYPE_JPEG:
+-        if (!lossyConverted && !hasBeenRunBefore && [defs boolForKey:@"GuetzliEnabled"] && [defs integerForKey:@"JpegOptimMaxQuality"] >= 80) {
++        if (lossyEnabled && !lossyConverted && !hasBeenRunBefore && [defs boolForKey:@"GuetzliEnabled"] && [defs integerForKey:@"JpegOptimMaxQuality"] >= 80) {
+             [worker_list addObject:[[GuetzliWorker alloc] initWithDefaults:defs serialQueue:serialQueue file:self]];
+             lossyConverted = YES;
+         }
+@@ -650,6 +651,12 @@
+             return;
+     }
+ 
++    if (!worker_list.count && !runFirst.count) {
++        [self setError:@"All engines for this image format are disabled in Settings"];
++        self.isDone = YES;
++        [self cleanup];
++        return;
++    }
+     BOOL isQueueUnderUtilized = queue.operationCount < queue.maxConcurrentOperationCount;
+ 
+     for (Worker *w in worker_list) {
+--- a/imageoptim/Backend/JobQueue.m
++++ b/imageoptim/Backend/JobQueue.m
+@@ -49,12 +49,21 @@
+         [fileIOQueue addObserver:self forKeyPath:@"operationCount" options:0 context:NULL];
+ 
+         operationCountUpdateQueue = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_OR, 0, 0, dispatch_get_main_queue());
++        __weak JobQueue *weakSelf = self;
+         dispatch_source_set_event_handler(operationCountUpdateQueue, ^{
+-            self.isBusy = self->cpuQueue.operationCount > 0 || self->dirWorkerQueue.operationCount > 0 || self->fileIOQueue.operationCount > 0;
++            JobQueue *owner = weakSelf;
++            if (owner) owner.isBusy = owner->cpuQueue.operationCount > 0 || owner->dirWorkerQueue.operationCount > 0 || owner->fileIOQueue.operationCount > 0;
+         });
+         dispatch_resume(operationCountUpdateQueue);
+     }
+     return self;
++}
++
++- (void)dealloc {
++    [cpuQueue removeObserver:self forKeyPath:@"operationCount"];
++    [fileIOQueue removeObserver:self forKeyPath:@"operationCount"];
++    [dirWorkerQueue removeObserver:self forKeyPath:@"operationCount"];
++    dispatch_source_cancel(operationCountUpdateQueue);
+ }
+ 
+ - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object
+--- a/imageoptim/Backend/Workers/CommandWorker.m
++++ b/imageoptim/Backend/Workers/CommandWorker.m
+@@ -69,7 +69,7 @@
+     NSURL *tempPath = [self tempPath];
+     @try {
+         BOOL keptFile = [self optimizeFile:job.wipInput toTempPath:tempPath];
+-        if (keptFile && ![self isCancelled]) {
++        if (keptFile) {
+             tempPath = nil;
+         }
+     }
+@@ -85,6 +85,8 @@
+ }
+ 
+ - (void)launchTask {
++    @synchronized(self) {
++    if (self.isCancelled) return;
+     @try {
+         BOOL supportsQoS = [task respondsToSelector:@selector(setQualityOfService:)];
+ 
+@@ -102,6 +104,8 @@
+     }
+     @catch (NSException *e) {
+         IOWarn("Failed to launch %@ - %@", [self className], e);
++        [job setError:[NSString stringWithFormat:@"Engine failed to start: %@", [e reason]]];
++    }
+     }
+ }
+ 
+@@ -110,6 +114,7 @@
+     int status = [task terminationStatus];
+     if (status) {
+         NSLog(@"Task %@ failed with status %d", [self className], status);
++        if (!self.isCancelled) [job setError:[NSString stringWithFormat:@"%@ exited with status %d",self.className,status]];
+         return NO;
+     }
+     return YES;
+@@ -131,12 +136,14 @@
+ }
+ 
+ - (void)cancel {
++    @synchronized(self) {
+     @try {
+         [task terminate];
+     } @catch (NSException *e) {
+         /* ignore */
+     }
+     [super cancel];
++    }
+ }
+ 
+ - (BOOL)taskForKey:(NSString *)key bundleName:(NSString *)resourceName arguments:(NSArray *)args {
+@@ -151,12 +158,7 @@
+ }
+ 
+ - (NSString *)pathForExecutableName:(NSString *)resourceName {
+-    NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+-
+-    NSString *path = [bundle pathForAuxiliaryExecutable:resourceName];
+-    if (!path) {
+-        path = [bundle pathForResource:resourceName ofType:@""];
+-    }
++    NSString *path = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:[@"Engines" stringByAppendingPathComponent:resourceName]];
+ 
+     if (path) {
+         if (![[NSFileManager defaultManager] isExecutableFileAtPath:path]) {
+@@ -178,10 +180,7 @@
+ }
+ 
+ - (NSURL *)tempPath {
+-    static int uid = 0;
+-    if (uid == 0) uid = getpid() << 12;
+-    NSString *filename = [NSString stringWithFormat:@"ImageOptim.%@.%x.%x.temp", [self className], (unsigned int)([Job hash] ^ [self hash]), uid++];
+-    return [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:filename]];
++    return [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"PhotoWorkbench.%@.temp", NSUUID.UUID.UUIDString]]];
+ }
+ 
+ - (BOOL)optimizeFile:(File *)file toTempPath:(NSURL *)tempPath {
+--- a/imageoptim/Backend/Workers/JpegoptimWorker.m
++++ b/imageoptim/Backend/Workers/JpegoptimWorker.m
+@@ -64,6 +64,10 @@
+     [task waitUntilExit];
+ 
+     [commandHandle closeFile];
++    if (task.terminationStatus != 0) {
++        if (!self.isCancelled) [job setError:@"JPEGOptim failed"];
++        return NO;
++    }
+ 
+     BOOL isSignificantlySmaller;
+     @synchronized(file) {
+--- a/imageoptim/Backend/Workers/OxiPngWorker.m
++++ b/imageoptim/Backend/Workers/OxiPngWorker.m
+@@ -26,8 +26,10 @@
+ -(BOOL)optimizeFile:(File *)file toTempPath:(NSURL *)temp {
+ 
+     NSMutableArray *args = [NSMutableArray arrayWithObjects: [NSString stringWithFormat:@"-o%d",(int)(optlevel ? optlevel : 6)],
+-                            @"-i0", @"-a",
++                            @"-i0",
+                             @"--out",temp.path,@"--",file.path,nil];
++    if (!job.pwStrictPixels) [args insertObject:@"-a" atIndex:0];
++
+     if (strip) {
+         [args insertObject:@"--strip=safe" atIndex:0];
+     }
+--- a/imageoptim/Backend/Workers/PngCrushWorker.m
++++ b/imageoptim/Backend/Workers/PngCrushWorker.m
+@@ -22,7 +22,9 @@
+ }
+ 
+ - (BOOL)optimizeFile:(File *)file toTempPath:(NSURL *)temp {
+-    NSMutableArray *args = [NSMutableArray arrayWithObjects:@"-nofilecheck", @"-bail", @"-blacken", @"-reduce", @"-cc", @"--", file.path, temp.path, nil];
++    NSMutableArray *args = [NSMutableArray arrayWithObjects:@"-nofilecheck", @"-bail", @"-reduce", @"-cc", @"--", file.path, temp.path, nil];
++
++    if (!job.pwStrictPixels) [args insertObject:@"-blacken" atIndex:0];
+ 
+     // Reusing PngOut config here
+     if (strip) {
+--- a/imageoptim/Backend/Workers/PngquantWorker.m
++++ b/imageoptim/Backend/Workers/PngquantWorker.m
+@@ -66,6 +66,7 @@
+         IODebug(@"pngquant skipped image due to poor compression");
+     } else if (status) {
+         IODebug(@"pngquant error %d", status);
++        if (!self.isCancelled) [job setError:[NSString stringWithFormat:@"pngquant exited with status %d",status]];
+         return NO;
+     }
+ 
+--- a/imageoptim/Backend/Workers/ZopfliWorker.m
++++ b/imageoptim/Backend/Workers/ZopfliWorker.m
+@@ -21,11 +21,13 @@
+ }
+ 
+ - (BOOL)optimizeFile:(File *)file toTempPath:(NSURL *)temp {
+-    NSMutableArray *args = [NSMutableArray arrayWithObjects:@"--lossy_transparent", @"-y", /*@"--",*/ file.path, temp.path, nil];
++    NSMutableArray *args = [NSMutableArray arrayWithObjects:@"-y", /*@"--",*/ file.path, temp.path, nil];
++
++    if (!job.pwStrictPixels) [args insertObject:@"--lossy_transparent" atIndex:0];
+ 
+     if (!strip) {
+         // FIXME: that's crappy. Should list actual chunks in file :/
+-        [args insertObject:@"--keepchunks=tEXt,zTXt,iTXt,gAMA,sRGB,iCCP,bKGD,pHYs,sBIT,tIME,oFFs,acTL,fcTL,fdAT,prVW,mkBF,mkTS,mkBS,mkBT" atIndex:0];
++        [args insertObject:@"--keepchunks=eXIf,tEXt,zTXt,iTXt,gAMA,sRGB,iCCP,bKGD,pHYs,sBIT,tIME,oFFs,acTL,fcTL,fdAT,prVW,mkBF,mkTS,mkBS,mkBT" atIndex:0];
+     }
+ 
+     NSInteger actualIterations = iterations;
+--- a/imageoptim/ResultsDb.m
++++ b/imageoptim/ResultsDb.m
+@@ -15,9 +15,6 @@
+         NSURL *cachesPath = [[NSFileManager defaultManager] URLForDirectory:NSCachesDirectory inDomain:NSUserDomainMask appropriateForURL:nil create:YES error:nil];
+         NSURL *cachesWithBundlePath = [cachesPath URLByAppendingPathComponent:[[NSBundle mainBundle] bundleIdentifier] isDirectory:YES];
+         [[NSFileManager defaultManager] createDirectoryAtURL:cachesWithBundlePath withIntermediateDirectories:YES attributes:nil error:nil];
+-        if ([[NSFileManager defaultManager] fileExistsAtPath:[cachesPath URLByAppendingPathComponent:@"ImageOptimResults.db"].path]) {
+-            [[NSFileManager defaultManager] moveItemAtURL:[cachesPath URLByAppendingPathComponent:@"ImageOptimResults.db"] toURL:[cachesWithBundlePath URLByAppendingPathComponent:@"Results.db"] error:nil];
+-        }
+         cachesPath = [cachesWithBundlePath URLByAppendingPathComponent:@"Results.db"];
+         IODebug(@"Results cache is in %@", cachesPath.path);
+         if (SQLITE_OK != sqlite3_open([cachesPath.path fileSystemRepresentation], &db)) {

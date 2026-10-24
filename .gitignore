@@ -22,3 +22,6 @@ target/
 
 # JavaScript dependencies
 node_modules/
+
+# Pinned third-party sources and original engine binaries; restored by run_prepare.sh
+/vendor/
