@@ -25,7 +25,8 @@ app=add('product', '{isa = PBXFileReference; explicitFileType = wrapper.applicat
 products=add('products', '{isa = PBXGroup; name = Products; children = ('+app+'); sourceTree = "<group>"; }')
 group=add('root', '{isa = PBXGroup; children = '+array(files+[products])+'; sourceTree = "<group>"; }')
 phase=add('sources', '{isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = '+array(sources)+'; runOnlyForDeploymentPostprocessing = 0; }')
-resources=add('resources', '{isa = PBXShellScriptBuildPhase; buildActionMask = 2147483647; files = (); inputPaths = (); outputPaths = (); alwaysOutOfDate = 1; runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/bash; shellScript = '+quote('set -eu\nbash "$SRCROOT/scripts/bundle_resources.sh" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"')+'; }')
+resource_outputs = ['$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/'+name for name in ['Engines', 'Notices', 'AppIcon.icns']]
+resources=add('resources', '{isa = PBXShellScriptBuildPhase; buildActionMask = 2147483647; files = (); inputPaths = (); outputPaths = '+array([quote(path) for path in resource_outputs])+'; alwaysOutOfDate = 1; runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/bash; shellScript = '+quote('set -eu\nbash "$SRCROOT/scripts/bundle_resources.sh" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"')+'; }')
 settings = {
  'PRODUCT_NAME':'PhotoWorkbench', 'PRODUCT_BUNDLE_IDENTIFIER':'local.cc.PhotoWorkbench',
  'INFOPLIST_FILE':'native/Info.plist','SWIFT_VERSION':'5.0','MACOSX_DEPLOYMENT_TARGET':'15.0',

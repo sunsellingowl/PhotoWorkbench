@@ -1,8 +1,10 @@
 # Third-party components
 
-PhotoWorkbench uses the ImageOptim backend at commit `8a4651e14ca53022f6a318071d08bb132fc56ce9`, with the reviewable modifications in `patches/imageoptim.patch`. The Swift UI, rename workflow, candidate validation and transactional save adapter are additions in `native/`. The original third-party copyright notices are retained.
+PhotoWorkbench uses the [ImageOptim](https://imageoptim.com/) backend by **Kornel Lesiński and contributors**, from [ImageOptim/ImageOptim](https://github.com/ImageOptim/ImageOptim) at commit `8a4651e14ca53022f6a318071d08bb132fc56ce9`, with the reviewable modifications in `patches/imageoptim.patch`. The Swift UI, rename workflow, candidate validation and transactional save adapter are additions in `native/`. The original third-party copyright notices are retained. This is an independent project, not an official ImageOptim release or an endorsement by its authors. Copyright in third-party code and engines remains with their respective rights holders.
 
 Engine executables were copied from the locally installed ImageOptim 1.9.3, except PNGOUT, obtained from its official macOS download. A source commit and an application release are separate provenance records; this project does not assert that the bundled binaries were compiled from that exact ImageOptim source commit. Engine SHA-256 values identify the exact inputs in `dependencies.lock.json`; no unreported version is guessed.
+
+PhotoWorkbench's original contributions are licensed under GPL-2.0-or-later; see `LICENSE` and `COPYRIGHT`. This grant does not change the licenses of third-party code or engines listed below.
 
 | Component | Version / identity | License / notice |
 | --- | --- | --- |
@@ -19,7 +21,9 @@ Engine executables were copied from the locally installed ImageOptim 1.9.3, exce
 | libpng validator | 1.6.50, compiled into PhotoWorkbench | libpng license, `libpng-LICENSE.txt` |
 | System frameworks / zlib / SQLite | macOS SDK and runtime | Supplied by macOS; not copied into the application |
 
-Additional upstream license texts are retained in `licenses/` and copied into the app. ImageOptim's bundled credits, its GPL text, the validator's libpng license and PNGOUT's readme are copied during preparation. Source URLs and checksum values for the downloaded notices are in the lock file. PNGOUT's source is not available; no independent redistribution permission is asserted here. This delivery is for local personal use, with public distribution outside the project scope.
+Upstream license texts are retained in `licenses/` and copied into the app. ImageOptim's bundled credits and PNGOUT's readme are copied during preparation. Source URLs and checksum values for the downloaded notices are in the lock file. The public repository contains source and build inputs, not third-party engine binaries or application release assets.
+
+PNGOUT is closed source and is not covered by the GPL. ImageOptim's credits state that its own PNGOUT bundle is included with permission of Ardfry Imaging, LLC; that statement is not permission for PhotoWorkbench to redistribute it. PNGOUT's readme identifies Ken Silverman and Jonathon Fowler but does not establish an independent redistribution grant here. Before publishing a bundled application, verify redistribution permission for every engine and provide the corresponding source and build materials required for GPL components. A version lock or a link to a binary download alone is not a substitute for those obligations.
 
 ## Local deviations from ImageOptim
 
@@ -31,4 +35,4 @@ Additional upstream license texts are retained in `licenses/` and copied into th
 - Cancellation/temporary file handling and engine error reporting are hardened. Two images are admitted at once; upstream worker scheduling handles their engines.
 - No persistent results cache is enabled in this version. Its source is retained for compatibility, with legacy cache migration removed.
 
-Upstream comparison uses pristine source from the locked archive. Only the UI header import and bundled executable locator are adapted in that harness. It does not apply the strict-pixel flags or the save adapter, and operates exclusively on generated fixtures.
+The upstream comparison harness used for the initial 0.9 validation is preserved in the `v0.9` Git tag. It uses pristine source from the locked archive, adapting only the UI header import and bundled executable locator. The current source tree keeps the native file-safety regression checks and omits that initial comparison harness.

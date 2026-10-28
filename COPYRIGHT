@@ -1,0 +1,25 @@
+PhotoWorkbench
+Copyright (C) 2026 PhotoWorkbench contributors
+
+The original code contributed to this repository is free software: you can
+redistribute it and/or modify it under the terms of the GNU General Public
+License as published by the Free Software Foundation, either version 2 of
+the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+more details. A copy is provided in LICENSE.
+
+SPDX-License-Identifier: GPL-2.0-or-later
+
+ImageOptim is by Kornel Lesiński and contributors. Its backend is reused
+under GNU GPL version 2 or later. Original authorship and license notices
+are preserved; the local modifications are in patches/imageoptim.patch.
+The modification dates and authors are recorded in this repository's Git
+history. PhotoWorkbench is not an official ImageOptim release.
+
+Third-party components retain their own copyrights and licenses. See
+THIRD_PARTY.md, licenses/, and the dependency lock file. This project's
+license does not relicense any third-party component or grant permission
+to redistribute PNGOUT or other separately licensed binaries.

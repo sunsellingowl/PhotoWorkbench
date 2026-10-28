@@ -23,5 +23,9 @@ target/
 # JavaScript dependencies
 node_modules/
 
-# Pinned third-party sources and original engine binaries; restored by run_prepare.sh
+# Pinned third-party sources and engine binaries; restored by scripts/run_prepare.sh
 /vendor/
+
+# Local editor settings and archived Python tools (available in the v0.9 tag)
+/.vscode/
+/legacy/

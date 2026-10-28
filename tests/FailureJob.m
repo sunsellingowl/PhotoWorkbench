@@ -1,4 +1,4 @@
-#import "FailureJob.h"
+#import "Checks-Bridging-Header.h"
 #import "Workers/CommandWorker.h"
 @implementation PWFailingTrashJob
 - (BOOL)trashOriginalAtURL:(NSURL *)url resultingURL:(NSURL **)result error:(NSError **)error {

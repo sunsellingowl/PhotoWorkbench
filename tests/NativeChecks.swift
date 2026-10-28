@@ -45,8 +45,6 @@ struct NativeChecks {
         defer { for domain in preferenceDomains { UserDefaults.standard.removePersistentDomain(forName: domain) } }
         let fm = FileManager.default
         let fixtures = URL(fileURLWithPath: CommandLine.arguments[1])
-        let baseline = URL(fileURLWithPath: CommandLine.arguments[2])
-        var comparisons: [[String: Any]] = []
         let root = fm.temporaryDirectory.appendingPathComponent("PhotoWorkbench-tests-\(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: root, withIntermediateDirectories: false)
         defer { try? fm.removeItem(at: root) }
@@ -149,10 +147,6 @@ struct NativeChecks {
             var err: NSError?
             try check(PWValidateImage(original, output, true, true, &err), "compressed pixels and metadata preserved: \(name)")
             try check(output.count <= original.count, "no larger output")
-            let baselineData = try Data(contentsOf: baseline.appendingPathComponent(name))
-            let baselineStrict = PWValidateImage(original, baselineData, true, true, &err)
-            comparisons.append(["file":name,"originalBytes":original.count,"nativeBytes":output.count,"upstreamBytes":baselineData.count,"upstreamPassesStrictValidation":baselineStrict,"upstreamPreservesPixels":PWValidateImage(original,baselineData,true,false,&err),"upstreamPreservesMetadata":PWValidateImage(original,baselineData,false,true,&err)])
-            if name.hasSuffix("JPG") { try check(output.count == baselineData.count && baselineStrict, "JPEG matches upstream baseline at the same settings") }
             if name.hasSuffix("png") { try check(output.count < original.count && job.canRevert, "PNG compression saved a smaller result and retained original") }
             renamedItem.signature = try signature(renamedItem.url)
             let next = PhotoCore.plan([renamedItem], style: .originalAndTimestamp)[0]
@@ -166,9 +160,6 @@ struct NativeChecks {
                 try check(back.url == renamedItem.url, "undo after compression and restore")
             }
         }
-        let report = try JSONSerialization.data(withJSONObject: comparisons, options: [.prettyPrinted, .sortedKeys])
-        try report.write(to: fixtures.deletingLastPathComponent().appendingPathComponent("comparison.json"))
-        print(String(data: report, encoding: .utf8)!)
         let corrupt = PWJob(url: try copy("corrupt.png")); try run([corrupt], defaults: defaults)
         try check(corrupt.isFailed, "corrupt input reported as failed")
         let stopped = (0..<6).map { _ in PWJob(url: try! copy("rgba8.png")) }

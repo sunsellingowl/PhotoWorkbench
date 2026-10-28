@@ -1,2 +1,4 @@
 #import "PWBackend.h"
-#import "FailureJob.h"
+@interface PWFailingTrashJob : PWJob
+@end
+void PWProbeEngineFailure(PWJob *job);

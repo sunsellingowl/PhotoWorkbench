@@ -21,9 +21,9 @@ def archive(name, ext):
 
 def verify():
     stamp=VENDOR/'.prepared'
-    require(stamp.exists(),'Dependencies are missing. Run bash run_prepare.sh.')
+    require(stamp.exists(),'Dependencies are missing. Run bash scripts/run_prepare.sh.')
     record=json.loads(stamp.read_text())
-    require(record['lock']==digest(ROOT/'dependencies.lock.json'),'Dependency lock changed; run run_prepare.sh again.')
+    require(record['lock']==digest(ROOT/'dependencies.lock.json'),'Dependency lock changed; run scripts/run_prepare.sh again.')
     require(record['patch']==digest(ROOT/'patches/imageoptim.patch'),'Source patch changed; re-prepare from clean vendor/ImageOptim.')
     for name, expected in LOCK['patchedSourceSha256'].items():
         require(digest(VENDOR/'ImageOptim'/name)==expected, f'Upstream patch not applied correctly: {name}')

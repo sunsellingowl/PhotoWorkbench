@@ -4,7 +4,7 @@
 
 - 原生应用为 PhotoWorkbench：Swift/SwiftUI 界面和重命名，复用固定版本 ImageOptim Objective-C 后端及预编译引擎。先读 README 的相关部分；整体调整需读完整 README。
 - Rename 和 Compress 是两个独立动作，加入文件不执行；按钮处理全部列表，选中行只用于预览和 Finder 操作。
-- 保留 Python/Tkinter 版本作为旧工具，不将新应用的秒级命名、压缩或撤销能力写到旧版本说明中。
+- Python/Tkinter 旧工具保留在本地忽略的 legacy/，公开历史见 v0.9 标签；不将原生功能写到旧版本说明中。
 - 本项目是日常工具；长期记忆用 README，不创建科研 PROJECT.md。
 
 ## 修改方式
@@ -30,8 +30,9 @@
 
 - 只用生成图片或明确授权的副本测试，不使用个人图库。
 - Python 优先 /Users/cc/opt/miniconda3/envs/mydailypython/bin/python。
-- bash run_prepare.sh、run_build.sh、run_native_checks.sh 分别准备、构建、验收；run_baseline_checks.sh 对比原始后端。旧版仍用 run_checks.sh。
+- 根目录仅保留 bash run_build.sh 和 bash run_checks.sh 两个入口；scripts/run_prepare.sh 准备依赖。上游对比工具已归档到本地 legacy/validation/，公开历史见 v0.9。旧 Python 检查为 bash legacy/run_checks.sh。
 - 涉及文件操作或压缩时，运行相应原生验收；区分编译、功能测试、上游比较、签名和实际 GUI 验证，不夸大覆盖范围。
 - 同步 README、运行脚本和许可证清单，明确限制及额外修改。
 - 不覆盖 /Applications/ImageOptim.app，不擅自安装到 Applications、不公证、不发布、不创建 GitHub PR。
 - Git 保留源码、工程、测试、补丁和锁文件，排除个人照片、vendor、副本、缓存及构建产物。完成后说明主要变化、验证结果和仍有的限制。
+- README 面向使用者；构建、安全约定和验证边界记录在 docs/DEVELOPMENT.md。发行二进制前另核对捆绑引擎的许可与对应源码，不能把源码公开等同于成品发行。
