@@ -91,7 +91,7 @@ static void pngRead(png_structp png, png_bytep output, png_size_t count) {
 }
 static void pngError(png_structp png, png_const_charp message) { png_longjmp(png,1); }
 static void pngWarning(png_structp png, png_const_charp message) {}
-static NSData *pngPixels(NSData *data, size_t *width, size_t *height) {
+static NSData *pngPixels(NSData *data, size_t *width, size_t *height, NSMutableDictionary *metadata) {
     png_structp png=png_create_read_struct(PNG_LIBPNG_VER_STRING,NULL,pngError,pngWarning);
     if (!png) return nil;
     png_infop info=png_create_info_struct(png);
@@ -103,6 +103,12 @@ static NSData *pngPixels(NSData *data, size_t *width, size_t *height) {
     r->data=data.bytes; r->size=data.length;
     png_set_read_fn(png,r,pngRead); png_set_user_limits(png,100000,100000);
     png_read_info(png,info);
+    png_charp profileName; png_bytep profile; png_uint_32 profileLength; int compression;
+    if (png_get_iCCP(png,info,&profileName,&compression,&profile,&profileLength)) {
+        // OxiPNG recompresses iCCP and changes its PNG wrapper label ("ICC" to "icc").
+        // Preserve the complete ICC profile itself, including its internal names and color data.
+        metadata[@"iCCP"]=@[[NSData dataWithBytes:profile length:profileLength]];
+    }
     *width=png_get_image_width(png,info); *height=png_get_image_height(png,info);
     // Bound memory before allocation, fail closed rather than silently weakening verification.
     if (!*width || !*height || *width > (256*1024*1024ULL)/8 / *height) png_error(png,"Image exceeds validation memory limit");
@@ -145,22 +151,42 @@ static NSData *jpegPixels(NSData *data, size_t *width, size_t *height) {
     }
     CGImageRelease(image); return result;
 }
-static BOOL validateUnlocked(NSData *original, NSData *candidate, BOOL lossless, BOOL keepMetadata, NSError **error) {
-    BOOL png=isPNG(original);
-    if (png!=isPNG(candidate)) return fail(error,@"Candidate changed the image format.");
-    NSDictionary *a=png?pngMetadata(original):jpegMetadata(original);
-    NSDictionary *b=png?pngMetadata(candidate):jpegMetadata(candidate);
-    if (!a || !b) return fail(error,@"Invalid, truncated, or animated image; original kept.");
-    if (keepMetadata && ![a isEqual:b]) return fail(error,@"Candidate rejected: protected metadata changed.");
-    size_t aw=0,ah=0,bw=0,bh=0;
-    NSData *ap=png?pngPixels(original,&aw,&ah):jpegPixels(original,&aw,&ah);
-    NSData *bp=png?pngPixels(candidate,&bw,&bh):jpegPixels(candidate,&bw,&bh);
-    if (!ap || !bp) return fail(error,@"Image could not be fully validated (limit: 256 MB decoded per image).");
-    if (aw!=bw || ah!=bh) return fail(error,@"Candidate changed image dimensions.");
-    if (lossless && ![ap isEqual:bp]) return fail(error,@"Candidate rejected: decoded pixels changed.");
+@implementation PWImageCheck {
+    BOOL _png;
+    size_t _width, _height;
+    NSDictionary *_metadata;
+    NSData *_pixelDigest;
+}
++ (instancetype)imageWithData:(NSData *)data error:(NSError **)error {
+    PWImageCheck *image=[self new];
+    image->_png=isPNG(data);
+    image->_metadata=image->_png?pngMetadata(data):jpegMetadata(data);
+    if (!image->_metadata) { fail(error,@"Invalid, truncated, or animated image; original kept."); return nil; }
+    // One transient pixel buffer across all workers; the cached reference is only a digest.
+    @synchronized(self) {
+        @autoreleasepool {
+            NSData *pixels=image->_png?pngPixels(data,&image->_width,&image->_height,(NSMutableDictionary *)image->_metadata):jpegPixels(data,&image->_width,&image->_height);
+            if (pixels) {
+                unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+                CC_SHA256(pixels.bytes,(CC_LONG)pixels.length,digest);
+                image->_pixelDigest=[NSData dataWithBytes:digest length:sizeof(digest)];
+            }
+        }
+    }
+    if (!image->_pixelDigest) { fail(error,@"Image could not be fully validated (limit: 256 MB decoded per image)."); return nil; }
+    return image;
+}
+- (BOOL)matches:(PWImageCheck *)candidate lossless:(BOOL)lossless keepMetadata:(BOOL)keepMetadata error:(NSError **)error {
+    if (_png!=candidate->_png) return fail(error,@"Candidate changed the image format.");
+    if (_width!=candidate->_width || _height!=candidate->_height) return fail(error,@"Candidate changed image dimensions.");
+    if (keepMetadata && ![_metadata isEqual:candidate->_metadata]) return fail(error,@"Candidate rejected: protected metadata changed.");
+    if (lossless && ![_pixelDigest isEqual:candidate->_pixelDigest]) return fail(error,@"Candidate rejected: decoded pixels changed.");
     return YES;
 }
+@end
 BOOL PWValidateImage(NSData *original, NSData *candidate, BOOL lossless, BOOL keepMetadata, NSError **error) {
-    // Bound simultaneous decoded buffers to two images (512 MB total), across all workers.
-    @synchronized([PWJob class]) { return validateUnlocked(original,candidate,lossless,keepMetadata,error); }
+    PWImageCheck *a=[PWImageCheck imageWithData:original error:error];
+    if (!a) return NO;
+    PWImageCheck *b=[PWImageCheck imageWithData:candidate error:error];
+    return b && [a matches:b lossless:lossless keepMetadata:keepMetadata error:error];
 }

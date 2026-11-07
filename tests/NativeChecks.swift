@@ -63,21 +63,21 @@ struct NativeChecks {
         print("Checking native metadata, renaming, collisions and undo…")
         let jpeg = try copy("capture.JPG", "中文 image.JPG")
         let item = try PhotoCore.load(jpeg)
-        try check(item.timestamp == "200102030405", "file creation time is used")
+        try check(item.timestamp == "2001020304", "file creation time is used")
         let digitized = try PhotoCore.timestamp(copy("digitized.jpg"))
         let dated = try PhotoCore.timestamp(copy("dated.jpg"))
-        try check(digitized.0 == "200102030405", "EXIF digitized time does not override creation time")
-        try check(dated.0 == "200102030405", "TIFF date does not override creation time")
+        try check(digitized.0 == "2001020304", "EXIF digitized time does not override creation time")
+        try check(dated.0 == "2001020304", "TIFF date does not override creation time")
         let fallback = try PhotoCore.load(copy("fallback.webp"))
-        try check(fallback.timeSource.contains("creation") && fallback.timestamp == "200102030405", "creation time is used even without EXIF")
+        try check(fallback.timeSource.contains("creation") && fallback.timestamp == "2001020304", "creation time is used even without EXIF")
         try fm.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1800000000)], ofItemAtPath: fallback.url.path)
         let afterModification = try PhotoCore.timestamp(fallback.url)
         try check(afterModification.0 == fallback.timestamp, "later modification does not change naming time")
         try expectFailure("missing file does not silently use a made-up date") { _ = try PhotoCore.timestamp(root.appendingPathComponent("missing.jpg")) }
         let bytes = try Data(contentsOf: jpeg), initialSignature = item.signature
-        let collision = root.appendingPathComponent("200102030405.JPG"); try bytes.write(to: collision)
+        let collision = root.appendingPathComponent("2001020304.JPG"); try bytes.write(to: collision)
         let first = PhotoCore.plan([item], style: .timestamp)[0]
-        try check(first.target?.lastPathComponent == "200102030405_001.JPG", "collision suffix and extension case")
+        try check(first.target?.lastPathComponent == "2001020304_001.JPG", "collision suffix and extension case")
         let renamed = try PhotoCore.rename(first)
         let renamedBytes = try Data(contentsOf: renamed.url)
         try check(renamedBytes == bytes && renamed.signature == initialSignature, "rename preserves contents, identity and modification date")
@@ -85,17 +85,32 @@ struct NativeChecks {
         try check(repeatPlan.target == renamed.url, "repeat rename is idempotent")
         let second = PhotoCore.plan([renamed], style: .originalAndTimestamp)[0]
         let switched = try PhotoCore.rename(second)
-        try check(switched.url.lastPathComponent == "中文 image_200102030405.JPG", "format switching remembers original")
+        try check(switched.url.lastPathComponent == "中文 image_2001020304.JPG", "format switching remembers original")
         let undoSecond = try PhotoCore.undo(RenameChange(id: item.id, from: renamed.url, to: switched.url), item: switched)
         let undone = try PhotoCore.undo(RenameChange(id: item.id, from: jpeg, to: renamed.url), item: undoSecond)
         try check(undone.url == jpeg, "multi-batch reverse order undo")
-        let legacy = try PhotoCore.load(copy("capture.JPG", "2001020304.JPG"))
+        let secondsFolder=root.appendingPathComponent("seconds", isDirectory:true)
+        try fm.createDirectory(at:secondsFolder,withIntermediateDirectories:false)
+        let secondsName=try PhotoCore.load(copy("capture.JPG","seconds/200102030405.JPG"))
+        try check(secondsName.originalBase == nil,"old second-only name is recognized")
+        let secondsPlan=PhotoCore.plan([secondsName],style:.timestamp)[0]
+        try check(secondsPlan.target?.lastPathComponent == "2001020304.JPG","old seconds convert to minutes")
+        let migrated=try PhotoCore.rename(secondsPlan)
+        _ = try PhotoCore.undo(RenameChange(id:migrated.id,from:secondsName.url,to:migrated.url),item:migrated)
+        let peerURL=try copy("capture.JPG","seconds/second-camera.JPG")
+        try fm.setAttributes([.creationDate:creation.addingTimeInterval(50)],ofItemAtPath:peerURL.path)
+        let peer=try PhotoCore.load(peerURL)
+        let minutePlans=PhotoCore.plan([secondsName,peer],style:.timestamp)
+        try check(secondsName.timestamp == peer.timestamp,"different seconds share one minute timestamp")
+        try check(Set(minutePlans.compactMap { $0.target?.lastPathComponent }) == ["2001020304.JPG","2001020304_001.JPG"],"same-minute collisions receive unique targets")
+        let legacy = try PhotoCore.load(collision)
         try check(legacy.originalBase == nil, "old minute-only name recognized")
-        try check(PhotoCore.plan([legacy], style: .originalAndTimestamp)[0].target == nil, "lost original name is skipped")
-        let originalLegacy = try PhotoCore.load(copy("capture.JPG", "Camera_2001020304_001.JPG"))
+        let lostOriginalPlan = PhotoCore.plan([legacy], style: .originalAndTimestamp)[0]
+        try check(lostOriginalPlan.target == nil && (try PhotoCore.rename(lostOriginalPlan)).status == "Skipped", "lost original name is skipped")
+        let originalLegacy = try PhotoCore.load(copy("capture.JPG", "Camera_200102030405_001.JPG"))
         try check(originalLegacy.originalBase == "Camera", "old suffix removed without duplication")
         let oldPlan = PhotoCore.plan([originalLegacy], style: .originalAndTimestamp)[0]
-        try check(oldPlan.target?.lastPathComponent == "Camera_200102030405.JPG", "old suffix upgraded to seconds")
+        try check(oldPlan.target?.lastPathComponent == "Camera_2001020304.JPG", "old suffix matches minute precision")
         let conflict = try PhotoCore.rename(oldPlan)
         try bytes.write(to: originalLegacy.url)
         try expectFailure("undo conflict is rejected") { _ = try PhotoCore.undo(RenameChange(id: conflict.id, from: originalLegacy.url, to: conflict.url), item: conflict) }
@@ -107,7 +122,15 @@ struct NativeChecks {
         try check(fm.fileExists(atPath: externallyEdited.url.path), "external edit retains file")
         try fm.createSymbolicLink(at: root.appendingPathComponent("link.jpg"), withDestinationURL: jpeg)
         _ = try copy("capture.JPG", ".hidden.jpg")
+        let nested = root.appendingPathComponent("nested", isDirectory: true)
+        let package = root.appendingPathComponent("ignored.app", isDirectory: true)
+        for folder in [nested, package] {
+            try fm.createDirectory(at: folder, withIntermediateDirectories: false)
+            try fm.copyItem(at: fixtures.appendingPathComponent("fallback.webp"), to: folder.appendingPathComponent("inside.webp"))
+        }
+        try fm.createSymbolicLink(at: root.appendingPathComponent("linked-folder"), withDestinationURL: nested)
         let scan = PhotoCore.scan([root, jpeg], excluding: [])
+        try check(scan.0.filter { $0.url.lastPathComponent == "inside.webp" }.map { $0.url.deletingLastPathComponent().lastPathComponent } == ["nested"], "nested folders are scanned; packages and directory symlinks are skipped")
         try check(scan.0.filter { PWFileIdentity($0.url) == PWFileIdentity(jpeg) }.count == 1, "deduplicated repeated inputs: \(scan.0.map { $0.url.path }) \(scan.1)")
         try check(!scan.0.contains { $0.url.lastPathComponent == "link.jpg" || $0.url.lastPathComponent == ".hidden.jpg" }, "hidden and symlink skipped")
 
@@ -127,12 +150,16 @@ struct NativeChecks {
             try check(!metadataChange, "EXIF and ICC stripping rejected")
             try check(strippingAllowed, "explicit metadata removal allows stripped result")
         }
+        try check(!(try validate(fixtures.appendingPathComponent("rgba8.png"),fixtures.appendingPathComponent("icc-changed.png"))),"different ICC profile is rejected")
+        try check(try validate(fixtures.appendingPathComponent("rgba8.png"),fixtures.appendingPathComponent("icc-changed.png"),keep:false),"profile-only change does not change raw PNG pixels")
         try check(!(try validate(fixtures.appendingPathComponent("animated.png"), fixtures.appendingPathComponent("animated.png"))), "APNG is safely rejected")
         for name in ["oversized.jpg", "oversized.png"] {
             let oversized = fixtures.appendingPathComponent(name)
             try check(!(try validate(oversized, oversized)), "oversized declared dimensions are rejected before pixel allocation")
         }
         print("Checking bundled engines, original preservation and restore…")
+        try check(WorkbenchModel.defaultSettings["AdvPngLevel"] as! Int == 2,"fast default effort")
+        try check(["PngOutEnabled","ZopfliEnabled","AdvPngEnabled","PngCrush2Enabled"].allSatisfy { WorkbenchModel.defaultSettings[$0] as! Bool == false },"deep PNG engines are opt-in")
         let defaults = settings()
         for name in ["rgba8.png", "rgba16.png", "capture.JPG"] {
             let url = try copy(name)
@@ -147,7 +174,7 @@ struct NativeChecks {
             var err: NSError?
             try check(PWValidateImage(original, output, true, true, &err), "compressed pixels and metadata preserved: \(name)")
             try check(output.count <= original.count, "no larger output")
-            if name.hasSuffix("png") { try check(output.count < original.count && job.canRevert, "PNG compression saved a smaller result and retained original") }
+            if name.hasSuffix("png") { try check(output.count < original.count && job.canRevert, "PNG compression saved a smaller result and retained original: \(name), \(job.validationNote ?? "no rejected candidate"), \(output.count)/\(original.count)") }
             renamedItem.signature = try signature(renamedItem.url)
             let next = PhotoCore.plan([renamedItem], style: .originalAndTimestamp)[0]
             let after = try PhotoCore.rename(next); job.filePath = after.url
@@ -203,7 +230,7 @@ struct NativeChecks {
         lossy.set(60, forKey: "JpegOptimMaxQuality")
         let lossyURL = try copy("plain.jpg"), lossyOriginal = try Data(contentsOf: lossyURL)
         let lossyJob = PWJob(url: lossyURL); try run([lossyJob], defaults: lossy)
-        try check(!lossyJob.isFailed && lossyJob.hasSavedOutput, "explicit lossy JPEG mode saves smaller output")
+        try check(!lossyJob.isFailed && lossyJob.savedInBatch, "explicit lossy JPEG mode saves smaller output")
         let lossyData = try Data(contentsOf: lossyURL); var error: NSError?
         try check(PWValidateImage(lossyOriginal, lossyData, false, false, &error), "lossy output still decodes correctly")
         try check(!PWValidateImage(lossyOriginal, lossyData, true, false, &error), "lossy quality changes require explicit opt-in")
@@ -263,6 +290,19 @@ struct NativeChecks {
         try check(model.items.allSatisfy { $0.url.lastPathComponent.hasPrefix("Photo_") }, "batch undo restores every name")
         model.compress(); try spin(until: { !model.busy })
         try check(model.summary.contains("300 skipped"), "unsupported compression formats are counted as skipped")
+        let progressFolder=root.appendingPathComponent("progress",isDirectory:true)
+        try fm.createDirectory(at:progressFolder,withIntermediateDirectories:false)
+        for n in 0..<6 { try fm.copyItem(at:fixtures.appendingPathComponent("benchmark.png"),to:progressFolder.appendingPathComponent("image_\(n).png")) }
+        let progressModel=WorkbenchModel(defaults:settings())
+        progressModel.add([progressFolder]);try spin(until: { !progressModel.scanning })
+        progressModel.compress()
+        var observedPartial=false
+        try spin(until: {
+            if progressModel.busy && progressModel.items.contains(where: { $0.status == "Compressed" || $0.status == "Unchanged" }) { observedPartial=true }
+            return !progressModel.busy
+        })
+        try check(observedPartial,"individual completions are visible before the whole batch finishes")
+        try check(progressModel.summary.contains("6/6") && !progressModel.items.contains(where: { $0.status.hasPrefix("Started") || $0.status == "Waiting" }),"finished batch has no stale active labels")
         print("Native checks passed: \(count)")
     }
 }

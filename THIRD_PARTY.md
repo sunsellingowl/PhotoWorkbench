@@ -29,10 +29,11 @@ PNGOUT is closed source and is not covered by the GPL. ImageOptim's credits stat
 
 - A different application bundle, own settings domain, internal engine paths, and no migration of original ImageOptim preferences or caches.
 - Strict lossless mode suppresses transparent RGB-changing flags. Lossy opt-in retains those upstream flags.
-- Zopfli's preservation list includes `eXIf`; all candidates are additionally checked before acceptance.
+- Zopfli's preservation list includes `eXIf`; each candidate is checked once before acceptance. The original decoded-pixel digest and metadata are cached, and saving uses immutable validated bytes. PNG ICC equality compares the complete decompressed ICC profile; its PNG wrapper label and zlib representation may change.
 - Guetzli requires explicit lossy settings. A settings change invalidates in-session worker skip records.
 - `PWJob` overrides saving and restoration with verified, same-volume atomic replacement and rollback, while retaining the smaller-result selection and Trash-based original retention.
+- PNG defaults to OxiPNG at effort 2; deep PNG optimizers remain available as explicit settings. Per-file completion is reported immediately, without repeatedly republishing unchanged rows.
 - Cancellation/temporary file handling and engine error reporting are hardened. Two images are admitted at once; upstream worker scheduling handles their engines.
-- No persistent results cache is enabled in this version. Its source is retained for compatibility, with legacy cache migration removed.
+- No persistent results cache is enabled: PhotoWorkbench creates jobs with `resultsDatabase:nil`. The upstream results database source and cache version marker are unchanged.
 
 The upstream comparison harness used for the initial 0.9 validation is preserved in the `v0.9` Git tag. It uses pristine source from the locked archive, adapting only the UI header import and bundled executable locator. The current source tree keeps the native file-safety regression checks and omits that initial comparison harness.

@@ -131,14 +131,13 @@
   },
   "patchedSourceSha256": {
     "imageoptim/Backend/Job.h": "cc1cbe829319cd18bfabea922fddb1d92b48c2a42111230c0a7de66d60882511",
-    "imageoptim/Backend/Job.m": "7769ca015682393395be13c21b7c262e9a7f6d75e0778460a5f827f2884dfebe",
+    "imageoptim/Backend/Job.m": "4068d6275921c8aee1dc26c8f12ed789693efc9858aa87595193a5da6974de46",
     "imageoptim/Backend/JobQueue.m": "3f738e93eae2f191379cb19c53006df0127e0226525dacce03f0b4dd57af4293",
     "imageoptim/Backend/Workers/CommandWorker.m": "9fbb1bd204ebe6e80b75206cb4810915c93e43d9bbbe00275808aec44ec2ab74",
     "imageoptim/Backend/Workers/JpegoptimWorker.m": "bbfe662555007967f89b30800b5e7c5b2c64168bda47d2b951e018b29ed96b21",
     "imageoptim/Backend/Workers/OxiPngWorker.m": "3a3062dde2fa950269722403a49c63386164e47683b5848217acc153288b69cf",
     "imageoptim/Backend/Workers/PngCrushWorker.m": "39aa7cdaa9025843b39406174a54a8aff2e906b68443c310b5c5e4e87e9f8904",
     "imageoptim/Backend/Workers/PngquantWorker.m": "84fa5d9463b8cbd2acce09342be6e25e0946ed4bd38197e8e98f3e44e24f93fa",
-    "imageoptim/Backend/Workers/ZopfliWorker.m": "a305f6efa82ae7643250cf16215e09e6ee91c3313238159581514b639c1ca669",
-    "imageoptim/ResultsDb.m": "2c2d1b8a0446742233ed6aa4dbae81bbace683378dff235365c1006dc6fba430"
+    "imageoptim/Backend/Workers/ZopfliWorker.m": "a305f6efa82ae7643250cf16215e09e6ee91c3313238159581514b639c1ca669"
   }
 }

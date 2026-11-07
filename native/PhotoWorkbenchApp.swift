@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import QuickLook
-import UniformTypeIdentifiers
 
 final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     weak var model: WorkbenchModel?
@@ -82,22 +81,14 @@ struct WorkbenchView: View {
                         Text("Drop images or folders here").font(.title3)
                         Text("Add first, then choose Rename or Compress.").foregroundStyle(.secondary)
                         Button("Add Images…", action: model.addPanel)
-                    }.allowsHitTesting(true)
+                    }
                 }
             }
             .overlay { if targeted { RoundedRectangle(cornerRadius: 6).stroke(Color.accentColor, lineWidth: 3).padding(3).allowsHitTesting(false) } }
-            .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
-                let group = DispatchGroup(), lock = NSLock()
-                var urls: [URL] = []
-                for provider in providers {
-                    group.enter()
-                    provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                        let url = (item as? URL) ?? (item as? Data).flatMap { URL(dataRepresentation: $0, relativeTo: nil) }
-                        if let url { lock.lock(); urls.append(url); lock.unlock() }; group.leave()
-                    }
-                }
-                group.notify(queue: .main) { model.add(urls) }; return true
-            }
+            // SwiftUI 直接交付 URL，省去 ItemProvider 的类型转换、锁和回调汇总。
+            .dropDestination(for: URL.self) { urls, _ in
+                model.add(urls); return true
+            } isTargeted: { targeted = $0 }
             Divider()
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
@@ -107,16 +98,19 @@ struct WorkbenchView: View {
                     if model.busy { Button("Stop", action: model.stop) }
                 }
                 HStack(spacing: 8) {
+                    Button("Add…", action: model.addPanel)
+                    Button("Remove") { model.remove(Set(model.items.map(\.id))) }
+                        .disabled(model.busy || model.items.isEmpty).help("Remove all images from the list; files are kept.")
+                    Button { settings = true } label: { Image(systemName: "gearshape") }.disabled(model.busy).help("Settings")
+                    Spacer(minLength: 0)
                     Picker("Name format", selection: $model.style) {
                         ForEach(NamingStyle.allCases) { Text($0.title).tag($0) }
                     }.labelsHidden().frame(width: 170).disabled(model.busy)
-                    Button("Rename", action: model.rename).disabled(model.busy || model.items.isEmpty)
-                    Button("Compress", action: model.compress).disabled(model.busy || model.items.isEmpty)
+                    Group {
+                        Button("Rename", action: model.rename).disabled(model.busy || model.items.isEmpty)
+                        Button("Compress", action: model.compress).disabled(model.busy || model.items.isEmpty)
+                    }.buttonStyle(.borderedProminent).tint(.blue)
                     Button { info.toggle() } label: { Image(systemName: "info.circle") }.buttonStyle(.plain).help("Compression behavior")
-                    Spacer(minLength: 0)
-                    Button("Add…", action: model.addPanel)
-                    Button("Clear") { model.remove(Set(model.items.map(\.id))) }.disabled(model.busy || model.items.isEmpty)
-                    Button { settings = true } label: { Image(systemName: "gearshape") }.disabled(model.busy).help("Settings")
                 }.controlSize(.small)
                 HStack {
                     Button("Undo Rename", action: model.undoRename).disabled(model.busy || model.undoBatches.isEmpty)
@@ -142,16 +136,13 @@ struct SettingsView: View {
     @AppStorage("LossyEnabled") private var lossy = false
     @AppStorage("JpegOptimMaxQuality") private var jpegQuality = 80
     @AppStorage("PngMinQuality") private var pngQuality = 80
-    @AppStorage("AdvPngLevel") private var effort = 4
+    @AppStorage("AdvPngLevel") private var effort = 2
     @AppStorage("JpegTranStripAll") private var stripJPEG = false
     @AppStorage("PngOutRemoveChunks") private var stripPNG = false
     @AppStorage("PreserveDates") private var dates = true
     @AppStorage("PreservePermissions") private var permissions = true
     @AppStorage("RunLowPriority") private var lowPriority = false
     @AppStorage("GuetzliEnabled") private var guetzli = false
-    private func engine(_ title: String, _ key: String) -> some View {
-        EngineSwitch(title: title, key: key)
-    }
     var body: some View {
         VStack(spacing: 0) {
             HStack { Text("Settings").font(.headline); Spacer() }.padding([.top, .horizontal], 16)
@@ -171,7 +162,8 @@ struct SettingsView: View {
                         Text("Metadata can contain capture time, orientation, camera details and color profiles. Originals are moved to Trash only when a smaller result is saved.").font(.caption).foregroundStyle(.secondary)
                     }
                     Section("JPEG engines") {
-                        engine("JPEGOptim", "JpegOptimEnabled"); engine("Jpegtran / MozJPEG", "JpegTranEnabled")
+                        EngineSwitch(title: "JPEGOptim", key: "JpegOptimEnabled")
+                        EngineSwitch(title: "Jpegtran / MozJPEG", key: "JpegTranEnabled")
                         Toggle("Guetzli (lossy only)", isOn: $guetzli)
                         if guetzli { Text("Requires lossy mode, JPEG quality ≥ 85 and JPEG metadata removal. These options are never changed automatically.").font(.caption).foregroundStyle(.orange) }
                     }
@@ -187,12 +179,14 @@ struct SettingsView: View {
                 case .speed:
                 Form {
                     Stepper("Optimization effort: \(effort) / 6", value: $effort, in: 0...6)
-                    Text("Higher effort can save more space but takes longer. ImageOptim's engine-specific scheduling and parameter mappings are retained.").font(.caption).foregroundStyle(.secondary)
+                    Text("Default: OxiPNG at effort 2. PNGOUT and Zopfli are optional deep optimizers and can take much longer. Higher effort may save more space.").font(.caption).foregroundStyle(.secondary)
                     Toggle("Run at low priority", isOn: $lowPriority)
                     Section("PNG engines") {
-                        engine("OxiPNG", "OptiPngEnabled"); engine("PNGOUT", "PngOutEnabled")
-                        engine("ZopfliPNG", "ZopfliEnabled"); engine("AdvPNG", "AdvPngEnabled")
-                        engine("PNGCrush", "PngCrush2Enabled")
+                        EngineSwitch(title: "OxiPNG", key: "OptiPngEnabled")
+                        EngineSwitch(title: "PNGOUT", key: "PngOutEnabled")
+                        EngineSwitch(title: "ZopfliPNG", key: "ZopfliEnabled")
+                        EngineSwitch(title: "AdvPNG", key: "AdvPngEnabled")
+                        EngineSwitch(title: "PNGCrush", key: "PngCrush2Enabled")
                         Text("AdvPNG runs when PNG metadata removal is allowed, matching ImageOptim.").font(.caption).foregroundStyle(.secondary)
                     }
                 }.formStyle(.grouped)

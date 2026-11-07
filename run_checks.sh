@@ -6,6 +6,7 @@ export CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-$PWD/build/ModuleCach
 export SWIFT_MODULECACHE_PATH="${SWIFT_MODULECACHE_PATH:-$PWD/build/ModuleCache}"
 if [[ "${1:-}" != --skip-build ]]; then bash run_build.sh; fi
 python_cmd="${PYTHON:-python3}"
+"$python_cmd" tests/check_icon.py native/AppIcon.icns
 "$python_cmd" tests/make_fixtures.py build/fixtures
 check_app="$PWD/build/NativeChecks.app"
 mkdir -p "$check_app/Contents/MacOS"

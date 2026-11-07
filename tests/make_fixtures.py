@@ -7,7 +7,7 @@ PROFILE=bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobyt
 PROFILE[24:36]=struct.pack('>6H',2020,1,1,0,0,0)
 PROFILE=bytes(PROFILE)
 def chunk(kind,data): return struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data)&0xffffffff)
-def png(name,depth=8,change=False,meta=True):
+def png(name,depth=8,change=False,meta=True,icc=PROFILE):
     w,h=64,48; rows=[]
     for y in range(h):
         row=bytearray([0])
@@ -24,13 +24,15 @@ def png(name,depth=8,change=False,meta=True):
     data=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,depth,6,0,0,0))
     if meta:
         data+=chunk(b'tEXt',b'Author\0PhotoWorkbench fixture')
-        data+=chunk(b'iCCP',b'ICC\0\0'+zlib.compress(PROFILE))
+        data+=chunk(b'iCCP',b'ICC\0\0'+zlib.compress(icc))
         exif=Image.Exif(); exif[34665]={36867:'2020:01:02 03:04:05',36868:'2021:02:03 04:05:06'}; exif[274]=6
         data+=chunk(b'eXIf',exif.tobytes()[6:])
     data+=chunk(b'IDAT',zlib.compress(b''.join(rows),0))+chunk(b'IEND',b'')
     (root/name).write_bytes(data)
 for depth in [8,16]:
     png(f'rgba{depth}.png',depth); png(f'rgba{depth}-changed.png',depth,True); png(f'rgba{depth}-stripped.png',depth,meta=False)
+changed_profile=bytearray(PROFILE); changed_profile[24:26]=struct.pack('>H',2021)
+png('icc-changed.png',icc=bytes(changed_profile))
 image=Image.new('RGB',(128,96))
 image.putdata([((x*5+y*3)%256,(x+y*7)%256,(x*2+y)%256) for y in range(96) for x in range(128)])
 exif=Image.Exif(); exif[34665]={36867:'2020:01:02 03:04:05',36868:'2021:02:03 04:05:06'}; exif[306]='2022:03:04 05:06:07'; exif[274]=6
@@ -54,4 +56,7 @@ while pos+4<len(oversized):
 (root/'oversized.jpg').write_bytes(oversized)
 d=(root/'rgba8.png').read_bytes()
 (root/'oversized.png').write_bytes(d[:8]+chunk(b'IHDR',struct.pack('>IIBBBBB',100000,100000,8,6,0,0,0))+d[33:])
+benchmark=Image.new('RGB',(1024,768))
+benchmark.putdata([((x//4+y//8)%256,(x//16+y//4)%256,(x//8+y//16)%256) for y in range(768) for x in range(1024)])
+benchmark.save(root/'benchmark.png',compress_level=0)
 for p in root.iterdir(): os.utime(p,(1700000000,1700000000))
